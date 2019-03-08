@@ -2,6 +2,8 @@ import Browser
 import Array exposing (Array)
 import Html exposing (..)
 import Html.Events exposing (..)
+import Browser.Events exposing (onKeyDown)
+import Json.Decode as Decode
 
 --element : { init : flags → (model, unknown), view : model → Html msg, update : msg → model → (model, unknown), subscriptions : model → unknown } → unknown
 main = Browser.element
@@ -11,8 +13,27 @@ main = Browser.element
       , subscriptions = subscriptions
       }
 
+type Direction
+    = Left
+    | Up
+    | Right
+    | Down
+    | Other
+
+keyDecoder : Decode.Decoder Direction
+keyDecoder = Decode.map toDirection <| Decode.field "key" Decode.string
+
+toDirection : String -> Direction
+toDirection string =
+    case string of
+        "ArrowLeft"  -> Left
+        "ArrowUp"    -> Up
+        "ArrowRight" -> Right
+        "ArrowDown"  -> Down
+        _            -> Other
+
 type Msg =
-    Change
+    Change Direction
 
 type alias Model =
     { board : Board
@@ -33,7 +54,7 @@ init _ =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        Change ->
+        Change direction ->
             ( { model | board = setBoard (1,2) (Tile 4) model.board }
             , Cmd.none
             )
@@ -47,7 +68,10 @@ view model =
         ]
 
 subscriptions : Model -> Sub Msg
-subscriptions model = Sub.none
+subscriptions model =
+    Sub.batch
+        [ onKeyDown (Decode.map Change keyDecoder)
+        ]
 
 viewBoard : Board -> Html Msg
 viewBoard board =
