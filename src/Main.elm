@@ -96,3 +96,21 @@ setBoard (x, y) cell board =
       |> Maybe.map (\oldRow -> Array.set y cell oldRow)
       |> Maybe.map (\newRow -> Array.set x newRow board)
       |> Maybe.withDefault board
+
+type Rule
+    = Waiting Cell (List Cell)
+    | Done (List Cell)
+
+applyRule : Cell -> Rule -> Rule
+applyRule cell rule =
+    case cell of
+        Empty -> rule
+        Tile number ->
+            case rule of
+                Waiting waitingCell cells ->
+                    if waitingCell == cell then
+                      Done (Tile (number + number) :: cells )
+                    else
+                      Waiting cell (waitingCell :: cells)
+                Done cells ->
+                    Waiting cell cells
