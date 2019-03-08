@@ -1,7 +1,7 @@
 import Browser
 import Array exposing (Array)
 import Html exposing (..)
-
+import Html.Events exposing (..)
 
 --element : { init : flags → (model, unknown), view : model → Html msg, update : msg → model → (model, unknown), subscriptions : model → unknown } → unknown
 main = Browser.element
@@ -12,7 +12,7 @@ main = Browser.element
       }
 
 type Msg =
-    None
+    Change
 
 type alias Model =
     { board : Board
@@ -31,13 +31,19 @@ init _ =
     )
 
 update : Msg -> Model -> (Model, Cmd Msg)
-update msg model = (model, Cmd.none)
+update msg model =
+    case msg of
+        Change ->
+            ( { model | board = setBoard (1,2) (Tile 4) model.board }
+            , Cmd.none
+            )
 
 view : Model -> Html Msg
 view model =
     div []
         [ h1 [] [ text "2048" ]
         , viewBoard model.board
+        , button [ onClick Change] [ text "Click Me" ]
         ]
 
 subscriptions : Model -> Sub Msg
@@ -58,3 +64,12 @@ viewCell cell =
     case cell of
       Tile num -> span [] [ text <| String.fromInt num ]
       Empty -> span [] []
+
+type alias Position = (Int, Int)
+
+setBoard : Position -> Cell -> Board -> Board
+setBoard (x, y) cell board =
+    Array.get x board
+      |> Maybe.map (\oldRow -> Array.set y cell oldRow)
+      |> Maybe.map (\newRow -> Array.set x newRow board)
+      |> Maybe.withDefault board
