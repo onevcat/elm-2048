@@ -5,6 +5,7 @@ import Html.Events exposing (..)
 import Browser.Events exposing (onKeyDown)
 import Json.Decode as Decode
 import Random
+import Html.Attributes exposing (..)
 
 main = Browser.element
       { init = init
@@ -62,11 +63,22 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Slide direction ->
-            ( { model | board = slideBoard direction model.board }
+            let
+              newBoard = slideBoard direction model.board
+              cmd = if model.board == newBoard then
+                    Cmd.none
+                    else
+                    randomPositionInEmpty newBoard
+                      |> Maybe.map (Random.generate New)
+                      |> Maybe.withDefault Cmd.none
+            in
+              ( { model | board = slideBoard direction model.board }
+              , cmd
+              )
+        New position ->
+            ( { model | board = setBoard position (Tile 2) model.board }
             , Cmd.none
             )
-        New position ->
-            (model, Cmd.none)
 
 view : Model -> Html Msg
 view model =
@@ -94,8 +106,8 @@ viewRow row =
 viewCell : Cell -> Html Msg
 viewCell cell =
     case cell of
-      Tile num -> span [] [ text <| String.fromInt num ]
-      Empty -> span [] [ text "_" ]
+      Tile num -> span [ style "padding" "1em" ] [ text <| String.fromInt num ]
+      Empty -> span [ style "padding" "1em" ] [ text "_" ]
 
 type alias Position = (Int, Int)
 
