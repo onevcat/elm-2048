@@ -4,8 +4,8 @@ import Html exposing (..)
 import Html.Events exposing (..)
 import Browser.Events exposing (onKeyDown)
 import Json.Decode as Decode
+import Random
 
---element : { init : flags → (model, unknown), view : model → Html msg, update : msg → model → (model, unknown), subscriptions : model → unknown } → unknown
 main = Browser.element
       { init = init
       , view = view
@@ -32,8 +32,9 @@ toDirection string =
         "ArrowDown"  -> Down
         _            -> Other
 
-type Msg =
-    Change Direction
+type Msg
+    = Slide Direction
+    | New Position
 
 type alias Model =
     { board : Board
@@ -45,19 +46,27 @@ type Cell
     = Tile Int
     | Empty
 
+rowCount : Int
+rowCount = 4
+
+columnCount : Int
+columnCount = 4
+
 init : () -> (Model, Cmd Msg)
 init _ =
-    ( Model <| Array.repeat 4 <| Array.repeat 4 <| Tile 1
+    ( Model <| Array.repeat rowCount <| Array.repeat columnCount <| Tile 1
     , Cmd.none
     )
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        Change direction ->
-            ( { model | board = setBoard (1,2) (Tile 4) model.board }
+        Slide direction ->
+            ( { model | board = slideBoard direction model.board }
             , Cmd.none
             )
+        New position ->
+            (model, Cmd.none)
 
 view : Model -> Html Msg
 view model =
@@ -69,7 +78,7 @@ view model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ onKeyDown (Decode.map Change keyDecoder)
+        [ onKeyDown (Decode.map Slide keyDecoder)
         ]
 
 viewBoard : Board -> Html Msg
@@ -86,7 +95,7 @@ viewCell : Cell -> Html Msg
 viewCell cell =
     case cell of
       Tile num -> span [] [ text <| String.fromInt num ]
-      Empty -> span [] []
+      Empty -> span [] [ text "_" ]
 
 type alias Position = (Int, Int)
 
@@ -97,16 +106,16 @@ setBoard (x, y) cell board =
       |> Maybe.map (\newRow -> Array.set x newRow board)
       |> Maybe.withDefault board
 
-type Rule
+type State
     = Waiting Cell (List Cell)
     | Done (List Cell)
 
-applyRule : Cell -> Rule -> Rule
-applyRule cell rule =
+applyRule : Cell -> State -> State
+applyRule cell state =
     case cell of
-        Empty -> rule
+        Empty -> state
         Tile number ->
-            case rule of
+            case state of
                 Waiting waitingCell cells ->
                     if waitingCell == cell then
                       Done (Tile (number + number) :: cells )
@@ -114,3 +123,73 @@ applyRule cell rule =
                       Waiting cell (waitingCell :: cells)
                 Done cells ->
                     Waiting cell cells
+
+slideBoard : Direction -> Board -> Board
+slideBoard direction board =
+    board |> listBoard |> slideListBoard direction |> arrayBoard
+
+slideListBoard : Direction -> List (List Cell) -> List (List Cell)
+slideListBoard direction board =
+    case direction of
+        Left ->
+            board
+              |> List.map List.reverse
+              |> slideListBoard Right
+              |> List.map List.reverse
+        Up ->
+            board
+              |> transpose
+              |> slideListBoard Left
+              |> transpose
+        Right ->
+            board
+              |> List.map slideRow
+        Down ->
+            board
+              |> transpose
+              |> slideListBoard Right
+              |> transpose
+        Other ->
+            board
+
+
+slideRow : List Cell -> List Cell
+slideRow row =
+    let
+        initState = List.foldr applyRule (Done []) row
+        newRow = case initState of
+            Waiting waiting done -> waiting :: done
+            Done done -> done
+    in
+        -- Use Empty to fill up all non tile.
+        List.repeat (List.length row - List.length newRow) Empty ++ newRow
+
+listBoard : Board -> List (List Cell)
+listBoard board = board |> Array.map Array.toList |> Array.toList
+
+arrayBoard : List (List Cell) -> Board
+arrayBoard board = board |> List.map Array.fromList |> Array.fromList
+
+transpose : List (List Cell) -> List (List Cell)
+transpose input = List.foldr (List.map2 (::)) (List.repeat (List.length input) []) input
+
+randomPositionInEmpty : Board -> Maybe (Random.Generator Position)
+randomPositionInEmpty board =
+    case allEmptyPositions board of
+        [] -> Nothing
+        head :: tail -> Just <| Random.uniform head tail
+
+allEmptyPositions : Board -> List Position
+allEmptyPositions board =
+    board |> listBoard
+          |> List.concat
+          |> List.indexedMap Tuple.pair
+          |> List.filterMap
+              (\(index, cell) ->
+                case cell of
+                    Tile _ -> Nothing
+                    Empty -> Just <| indexToPosition index
+              )
+
+indexToPosition : Int -> Position
+indexToPosition index = ( index // columnCount, remainderBy columnCount index )
