@@ -64,7 +64,6 @@ view model =
     div []
         [ h1 [] [ text "2048" ]
         , viewBoard model.board
-        , button [ onClick Change] [ text "Click Me" ]
         ]
 
 subscriptions : Model -> Sub Msg
